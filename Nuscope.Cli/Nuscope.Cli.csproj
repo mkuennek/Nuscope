@@ -7,7 +7,7 @@
     <AssemblyName>nuscope</AssemblyName>
     <RootNamespace>Nuscope.Cli</RootNamespace>
     <PackageId>Nuscope</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>Nuscope</Authors>
     <Description>Inspect NuGet packages and .NET assemblies for discoverable symbols.</Description>
     <PackageTags>nuget;metadata;assembly;cli;tool</PackageTags>
