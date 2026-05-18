@@ -95,11 +95,12 @@ Useful targets:
 dotnet pipeline.cs -- --target Build
 dotnet pipeline.cs -- --target Test
 dotnet pipeline.cs -- --target Pack
+dotnet pipeline.cs -- --target Publish
 dotnet pipeline.cs -- --target InstallLocally
 dotnet pipeline.cs -- --target CI --rebuild
 ```
 
-The `Pack`/`CI` targets write NuGet tool packages to `artifacts/packages`. The `InstallLocally` target packs the tool, installs it globally from that local package source, and copies the Nuscope agent skill to `~/.agents/skills/nuscope`.
+The `Pack`/`CI` targets write NuGet tool packages to `artifacts/packages`. The `Publish` target packs and publishes packages to NuGet using the `NUGET_API_KEY` environment variable. Override the feed with `--nugetSource <url>` when needed. The `InstallLocally` target packs the tool, installs it globally from that local package source, and copies the Nuscope agent skill to `~/.agents/skills/nuscope`.
 
 ## Test
 

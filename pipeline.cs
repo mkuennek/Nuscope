@@ -3,6 +3,7 @@
 
 var target = Argument("target", "Default");
 var configuration = Argument("configuration", "Release");
+var nugetSource = Argument("nugetSource", "https://api.nuget.org/v3/index.json");
 
 const string solution = "./Nuscope.slnx";
 const string testProject = "./Nuscope.Cli.Tests/Nuscope.Cli.Tests.csproj";
@@ -67,6 +68,37 @@ Task("Pack")
         NoRestore = true,
         OutputDirectory = packagesDirectory,
     });
+});
+
+Task("Publish")
+    .IsDependentOn("Pack")
+    .Does(() =>
+{
+    var nugetApiKey = EnvironmentVariable("NUGET_API_KEY");
+
+    if (string.IsNullOrWhiteSpace(nugetApiKey))
+    {
+        throw new Exception("NUGET_API_KEY environment variable is required to publish packages.");
+    }
+
+    var packages = GetFiles($"{packagesDirectory}/*.nupkg");
+
+    if (packages.Count == 0)
+    {
+        throw new Exception($"No NuGet packages found in {packagesDirectory}.");
+    }
+
+    foreach (var package in packages)
+    {
+        Information("Publishing {0} to {1}.", package.GetFilename(), nugetSource);
+
+        DotNetNuGetPush(package.FullPath, new DotNetNuGetPushSettings
+        {
+            Source = nugetSource,
+            ApiKey = nugetApiKey,
+            SkipDuplicate = true,
+        });
+    }
 });
 
 Task("InstallLocally")
