@@ -10,16 +10,32 @@ internal sealed class TestWorkspace
     public static TestWorkspace Current { get; } = new();
 
     private readonly Lazy<Task<SampleArtifacts>> _sample;
+    private readonly Lazy<Task<NuGetFeed>> _feed;
 
     private TestWorkspace()
     {
         _sample = new Lazy<Task<SampleArtifacts>>(CreateSampleAsync);
+        _feed = new Lazy<Task<NuGetFeed>>(CreateFeedAsync);
     }
 
     /// <summary>
     /// Returns the compiled sample assembly and package used as inspection targets.
     /// </summary>
     public Task<SampleArtifacts> SampleAsync() => _sample.Value;
+
+    /// <summary>
+    /// Returns the shared in-process NuGet feed used by all remote package tests.
+    /// </summary>
+    public Task<NuGetFeed> FeedAsync() => _feed.Value;
+
+    /// <summary>
+    /// Starts the dummy NuGet feed once per test process to avoid parallel tests racing for ports.
+    /// </summary>
+    private async Task<NuGetFeed> CreateFeedAsync()
+    {
+        var sample = await SampleAsync();
+        return await NuGetFeed.StartAsync(sample);
+    }
 
     /// <summary>
     /// Creates a temporary sample project that exposes the symbols needed by the integration tests.
