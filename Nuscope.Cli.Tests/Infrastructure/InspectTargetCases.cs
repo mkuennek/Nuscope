@@ -31,12 +31,11 @@ public static class InspectTargetCases
             return new InspectTargetLease(new InspectTarget([target], Path.GetFileName(target)));
         }
 
-        var sample = await TestWorkspace.Current.SampleAsync();
-        var feed = await NuGetFeed.StartAsync(sample);
+        var feed = await TestWorkspace.Current.FeedAsync();
         var inspectTarget = new InspectTarget(
             [target, "--source", feed.ServiceIndexUrl, "--version", "1.0.0"],
             target);
 
-        return new InspectTargetLease(inspectTarget, feed);
+        return new InspectTargetLease(inspectTarget);
     }
 }
