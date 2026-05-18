@@ -13,6 +13,191 @@ const string skillDirectory = "./skills/nuscope";
 const string artifactsDirectory = "./artifacts";
 const string packagesDirectory = "./artifacts/packages";
 
+string ReadPackageVersion(string projectXml)
+{
+    var document = System.Xml.Linq.XDocument.Parse(projectXml);
+    var version = document.Descendants("Version").FirstOrDefault()?.Value;
+
+    if (string.IsNullOrWhiteSpace(version))
+    {
+        throw new Exception("Could not find a <Version> element in the package project file.");
+    }
+
+    return version.Trim();
+}
+
+string ReadCurrentPackageVersion()
+{
+    return ReadPackageVersion(System.IO.File.ReadAllText(packProject));
+}
+
+string RunGit(params string[] arguments)
+{
+    var output = new System.Text.StringBuilder();
+    var error = new System.Text.StringBuilder();
+    using var process = new System.Diagnostics.Process();
+
+    process.StartInfo = new System.Diagnostics.ProcessStartInfo
+    {
+        FileName = "git",
+        RedirectStandardError = true,
+        RedirectStandardOutput = true,
+        UseShellExecute = false,
+    };
+
+    foreach (var argument in arguments)
+    {
+        process.StartInfo.ArgumentList.Add(argument);
+    }
+
+    process.OutputDataReceived += (_, args) =>
+    {
+        if (args.Data is not null)
+        {
+            output.AppendLine(args.Data);
+        }
+    };
+    process.ErrorDataReceived += (_, args) =>
+    {
+        if (args.Data is not null)
+        {
+            error.AppendLine(args.Data);
+        }
+    };
+
+    process.Start();
+    process.BeginOutputReadLine();
+    process.BeginErrorReadLine();
+    process.WaitForExit();
+
+    if (process.ExitCode != 0)
+    {
+        throw new Exception($"git {string.Join(' ', arguments)} failed: {error.ToString().Trim()}");
+    }
+
+    return output.ToString().Trim();
+}
+
+string? GetCurrentBranchName()
+{
+    var githubRefName = EnvironmentVariable("GITHUB_REF_NAME");
+
+    if (!string.IsNullOrWhiteSpace(githubRefName))
+    {
+        return githubRefName;
+    }
+
+    var githubRef = EnvironmentVariable("GITHUB_REF");
+
+    if (!string.IsNullOrWhiteSpace(githubRef) && githubRef.StartsWith("refs/heads/", StringComparison.Ordinal))
+    {
+        return githubRef["refs/heads/".Length..];
+    }
+
+    try
+    {
+        return RunGit("branch", "--show-current");
+    }
+    catch (Exception exception)
+    {
+        Information("Could not determine current git branch: {0}", exception.Message);
+        return null;
+    }
+}
+
+bool IsMainBranch()
+{
+    var branch = GetCurrentBranchName();
+    var isMain = string.Equals(branch, "main", StringComparison.Ordinal);
+
+    Information("Current branch: {0}", string.IsNullOrWhiteSpace(branch) ? "<unknown>" : branch);
+    Information("On main branch: {0}", isMain);
+
+    return isMain;
+}
+
+string GetPackageBaseAddress()
+{
+    using var httpClient = new System.Net.Http.HttpClient();
+    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Nuscope-Build/1.0");
+
+    using var response = httpClient.GetAsync(nugetSource).GetAwaiter().GetResult();
+
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new Exception($"Could not read NuGet service index from {nugetSource}: {(int)response.StatusCode} {response.ReasonPhrase}");
+    }
+
+    using var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+    using var document = System.Text.Json.JsonDocument.Parse(stream);
+
+    foreach (var resource in document.RootElement.GetProperty("resources").EnumerateArray())
+    {
+        var type = resource.GetProperty("@type").GetString();
+
+        if (type?.Split('/').Any(value => value.Equals("PackageBaseAddress", StringComparison.OrdinalIgnoreCase)) == true)
+        {
+            return resource.GetProperty("@id").GetString() ?? throw new Exception("PackageBaseAddress resource did not include an @id.");
+        }
+    }
+
+    throw new Exception($"Could not find a PackageBaseAddress resource in {nugetSource}.");
+}
+
+bool PackageVersionExistsOnSource()
+{
+    var currentVersion = NuGet.Versioning.NuGetVersion.Parse(ReadCurrentPackageVersion()).ToNormalizedString();
+    var packageId = toolPackageId.ToLowerInvariant();
+    var packageBaseAddress = GetPackageBaseAddress().TrimEnd('/');
+    var versionIndexUrl = $"{packageBaseAddress}/{packageId}/index.json";
+
+    Information("Checking whether {0} {1} exists on {2}.", toolPackageId, currentVersion, nugetSource);
+
+    using var httpClient = new System.Net.Http.HttpClient();
+    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Nuscope-Build/1.0");
+
+    using var response = httpClient.GetAsync(versionIndexUrl).GetAwaiter().GetResult();
+
+    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+    {
+        Information("Package {0} does not exist on {1} yet.", toolPackageId, nugetSource);
+        return false;
+    }
+
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new Exception($"Could not read package version index from {versionIndexUrl}: {(int)response.StatusCode} {response.ReasonPhrase}");
+    }
+
+    using var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+    using var document = System.Text.Json.JsonDocument.Parse(stream);
+    var exists = document.RootElement.GetProperty("versions")
+        .EnumerateArray()
+        .Select(version => NuGet.Versioning.NuGetVersion.Parse(version.GetString()!).ToNormalizedString())
+        .Any(version => string.Equals(version, currentVersion, StringComparison.OrdinalIgnoreCase));
+
+    Information("Package version exists on source: {0}", exists);
+
+    return exists;
+}
+
+bool ShouldDeployPackage()
+{
+    if (!IsMainBranch())
+    {
+        Information("Skipping deployment because packages may only be published from the main branch.");
+        return false;
+    }
+
+    if (PackageVersionExistsOnSource())
+    {
+        Information("Skipping deployment because this package version already exists on the NuGet source.");
+        return false;
+    }
+
+    return true;
+}
+
 Task("Clean")
     .WithCriteria(c => HasArgument("rebuild"))
     .Does(() =>
@@ -74,6 +259,11 @@ Task("Publish")
     .IsDependentOn("Pack")
     .Does(() =>
 {
+    if (!IsMainBranch())
+    {
+        throw new Exception("Packages may only be published from the main branch.");
+    }
+
     var nugetApiKey = EnvironmentVariable("NUGET_API_KEY");
 
     if (string.IsNullOrWhiteSpace(nugetApiKey))
@@ -177,5 +367,18 @@ Task("Default")
 
 Task("CI")
     .IsDependentOn("Pack");
+
+Task("Deploy")
+    .IsDependentOn("Publish");
+
+if (target.Equals("Deploy", StringComparison.OrdinalIgnoreCase) && !ShouldDeployPackage())
+{
+    return;
+}
+
+if (target.Equals("Publish", StringComparison.OrdinalIgnoreCase) && !IsMainBranch())
+{
+    throw new Exception("Packages may only be published from the main branch.");
+}
 
 RunTarget(target);
