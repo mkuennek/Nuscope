@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish NuGet package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Deploy if package version is new
+        run: dotnet pipeline.cs -- --target Deploy
+        env:
+          DOTNET_NOLOGO: true
+          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
