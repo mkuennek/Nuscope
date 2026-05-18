@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="AGENTS.md" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="pipeline.cs" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="Nuscope.Cli.Tests/Nuscope.Cli.Tests.csproj" />
+  <Project Path="Nuscope.Cli/Nuscope.Cli.csproj" />
+</Solution>
