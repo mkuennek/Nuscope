@@ -34,6 +34,7 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("    public System.Guid Id { get; private set; }");
             await Assert.That(result.Output).Contains("    public (int32, int32) Bounds { get; }");
             await Assert.That(result.Output).Contains("    public System.Collections.Generic.IReadOnlyDictionary<string, Nuscope.Sample.WidgetSize> SizesByName { get; }");
+            await Assert.That(result.Output).Contains("    /// Constrains a size to the supplied bounds.");
             await Assert.That(result.Output).Contains("    public (int32, int32) Constrain((int32, int32));");
             await Assert.That(result.Output).Contains("    public T Echo<T>(T);");
             await Assert.That(result.Output).Contains("    public int32 Resize(int32, int32);");

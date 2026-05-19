@@ -10,7 +10,7 @@ internal sealed class DocumentationSignatureTypeProvider : ISignatureTypeProvide
 
     public string GetByReferenceType(string elementType) => $"{elementType}@";
     public string GetFunctionPointerType(MethodSignature<string> signature) => "=FUNC:";
-    public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => $"{genericType}{{{string.Join(',', typeArguments)}}}";
+    public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => $"{MetadataNames.StripGenericArity(genericType)}{{{string.Join(',', typeArguments)}}}";
     public string GetGenericMethodParameter(object? genericContext, int index) => $"``{index}";
     public string GetGenericTypeParameter(object? genericContext, int index) => $"`{index}";
     public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
