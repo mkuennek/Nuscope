@@ -247,7 +247,7 @@ internal static class PackageInspector
                 $"{typeName}.{fieldName}",
                 "field",
                 visibility,
-                formatter.FormatField(field),
+                formatter.FormatField(type, field),
                 documentation.Get(documentationId),
                 typeName,
                 displayPath));
@@ -283,7 +283,7 @@ internal static class PackageInspector
                 $"{typeName}.{propertyName}",
                 "property",
                 visibility,
-                formatter.FormatProperty(property),
+                formatter.FormatProperty(type, property),
                 documentation.Get(documentationId),
                 typeName,
                 displayPath,
@@ -345,7 +345,7 @@ internal static class PackageInspector
                 $"{typeName}.{eventName}",
                 "event",
                 visibility,
-                formatter.FormatEvent(eventDef),
+                formatter.FormatEvent(type, eventDef),
                 documentation.Get(documentationId),
                 typeName,
                 displayPath));
@@ -387,7 +387,7 @@ internal static class PackageInspector
                 $"{typeName}.{(kind == SymbolKind.Constructor ? MetadataNames.GetShortName(typeName) : methodName)}",
                 kind == SymbolKind.Constructor ? "constructor" : "method",
                 visibility,
-                formatter.FormatMethod(method),
+                formatter.FormatMethod(type, method),
                 documentation.Get(documentationId),
                 typeName,
                 displayPath));

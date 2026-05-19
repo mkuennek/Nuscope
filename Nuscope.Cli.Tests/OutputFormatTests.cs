@@ -32,8 +32,16 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("    public string Name { get; }");
             await Assert.That(result.Output).Contains("    public int32 Priority { get; set; }");
             await Assert.That(result.Output).Contains("    public System.Guid Id { get; private set; }");
+            await Assert.That(result.Output).Contains("    public (int32, int32) Bounds { get; }");
+            await Assert.That(result.Output).Contains("    public System.Collections.Generic.IReadOnlyDictionary<string, Nuscope.Sample.WidgetSize> SizesByName { get; }");
+            await Assert.That(result.Output).Contains("    public (int32, int32) Constrain((int32, int32));");
+            await Assert.That(result.Output).Contains("    public T Echo<T>(T);");
             await Assert.That(result.Output).Contains("    public int32 Resize(int32, int32);");
             await Assert.That(result.Output).Contains("    public event System.EventHandler Changed;");
+            await Assert.That(result.Output).Contains("  public sealed class WidgetBox<T>");
+            await Assert.That(result.Output).Contains("    public WidgetBox(T);");
+            await Assert.That(result.Output).Contains("    public System.Collections.Generic.IReadOnlyList<(string, T)> Entries { get; }");
+            await Assert.That(result.Output).Contains("    public T Value { get; }");
             await Assert.That(result.Output).Contains("  }");
 
             var widgetIndex = result.Output.IndexOf("  public sealed class Widget", StringComparison.Ordinal);

@@ -102,6 +102,12 @@ internal static class OutputWriter
     private static string FormatTypeDeclaration(SymbolInfo symbol, string typeName)
     {
         var declaration = symbol.Signature ?? $"{symbol.Visibility} {symbol.Classification} {typeName}";
+        var namespaceEnd = typeName.LastIndexOf('.');
+        if (namespaceEnd >= 0)
+        {
+            declaration = declaration.Replace(typeName[..(namespaceEnd + 1)], string.Empty, StringComparison.Ordinal);
+        }
+
         return declaration.Replace(typeName, GetShortTypeName(typeName), StringComparison.Ordinal);
     }
 
@@ -113,7 +119,7 @@ internal static class OutputWriter
         var signature = symbol.Signature ?? symbol.Name;
         return symbol.Kind switch
         {
-            SymbolKind.Constructor => $"{symbol.Visibility} {GetShortTypeName(typeName)}{GetParameterList(signature)};",
+            SymbolKind.Constructor => $"{symbol.Visibility} {GetCallableDeclaration(signature, GetShortTypeName(typeName))};",
             SymbolKind.Property => $"{symbol.Visibility} {signature} {{ {FormatAccessors(symbol)} }}",
             SymbolKind.Event => $"{symbol.Visibility} event {signature};",
             _ => $"{symbol.Visibility} {signature};"
@@ -133,6 +139,21 @@ internal static class OutputWriter
     {
         var start = signature.IndexOf('(');
         return start < 0 ? "()" : signature[start..];
+    }
+
+    /// <summary>
+    /// Removes the metadata return type from a formatted method-like signature.
+    /// </summary>
+    private static string GetCallableDeclaration(string signature, string fallbackName)
+    {
+        var parameterStart = signature.IndexOf('(');
+        if (parameterStart < 0)
+        {
+            return $"{fallbackName}()";
+        }
+
+        var nameStart = signature.LastIndexOf(' ', parameterStart);
+        return nameStart < 0 ? signature : signature[(nameStart + 1)..];
     }
 
     /// <summary>
@@ -170,7 +191,8 @@ internal static class OutputWriter
     private static string GetShortTypeName(string typeName)
     {
         var index = typeName.LastIndexOf('.');
-        return index < 0 ? typeName : typeName[(index + 1)..];
+        var shortName = index < 0 ? typeName : typeName[(index + 1)..];
+        return MetadataNames.StripGenericArity(shortName);
     }
 
     /// <summary>
