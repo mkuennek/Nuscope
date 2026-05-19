@@ -53,6 +53,8 @@ internal sealed class TestWorkspace
                 <LangVersion>latest</LangVersion>
                 <Nullable>enable</Nullable>
                 <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+                <GenerateDocumentationFile>true</GenerateDocumentationFile>
+                <NoWarn>$(NoWarn);1591</NoWarn>
                 <PackageId>Nuscope.Sample</PackageId>
                 <Version>1.0.0</Version>
               </PropertyGroup>
@@ -61,6 +63,7 @@ internal sealed class TestWorkspace
 
         await File.WriteAllTextAsync(Path.Combine(sampleDir, "Widget.cs"), """
             using System;
+            using System.Collections.Generic;
 
             namespace Nuscope.Sample;
 
@@ -71,14 +74,41 @@ internal sealed class TestWorkspace
                 int Resize(int width, int height);
             }
 
+            /// <summary>
+            /// Represents a documented <see cref="Widget"/>.
+            /// </summary>
             public sealed class Widget : IWidget
             {
+                /// <summary>The fallback widget name.</summary>
                 public const string DefaultName = "widget";
+                /// <summary>Gets the widget display name.</summary>
                 public string Name { get; }
+                /// <summary>Gets or sets the widget priority.</summary>
+                public int Priority { get; set; }
+                /// <summary>Raised when the widget changes.</summary>
                 public event EventHandler? Changed;
+                /// <summary>Gets the widget instance identifier.</summary>
+                public Guid Id { get; private set; }
+                /// <summary>Gets widget sizes by name.</summary>
+                public IReadOnlyDictionary<string, WidgetSize> SizesByName { get; } = new Dictionary<string, WidgetSize>();
+                /// <summary>Gets the default widget bounds.</summary>
+                public (int Width, int Height) Bounds { get; } = (0, 0);
+                /// <summary>Creates a widget with the supplied name.</summary>
                 public Widget(string name) => Name = name;
+                /// <summary>Resizes the widget and returns the new area.</summary>
                 public int Resize(int width, int height) => width * height;
+                /// <summary>Returns the supplied value unchanged.</summary>
+                public T Echo<T>(T value) => value;
+                /// <summary>Constrains a size to the supplied bounds.</summary>
+                public (int Width, int Height) Constrain((int Width, int Height) bounds) => bounds;
                 internal void Hidden() { }
+            }
+
+            public sealed class WidgetBox<T>
+            {
+                public WidgetBox(T value) => Value = value;
+                public T Value { get; }
+                public IReadOnlyList<(string Name, T Value)> Entries { get; } = Array.Empty<(string Name, T Value)>();
             }
 
             public readonly struct WidgetSize

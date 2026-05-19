@@ -29,11 +29,22 @@ JSON uses PascalCase property names and string enum values:
           "Classification": "static class",
           "Visibility": "public",
           "Signature": "public static class Newtonsoft.Json.JsonConvert",
-          "DocumentationId": null,
+          "Documentation": "Provides methods for converting between .NET types and JSON types.",
           "DeclaringType": "System.Object",
           "AssemblyPath": "lib/netstandard2.0/Newtonsoft.Json.dll",
           "TypeKind": "Class",
           "Modifiers": ["static"]
+        },
+        {
+          "Kind": "Property",
+          "Name": "Example.Widget.Id",
+          "Classification": "property",
+          "Visibility": "public",
+          "Signature": "public System.Guid Id { get; private set; }",
+          "Documentation": "Gets the widget instance identifier.",
+          "DeclaringType": "Example.Widget",
+          "AssemblyPath": "lib/net10.0/Example.dll",
+          "Accessors": ["get;", "private set;"]
         }
       ]
     }
@@ -41,14 +52,17 @@ JSON uses PascalCase property names and string enum values:
 }
 ```
 
-`Kind` is one of `Type`, `Method`, `Property`, `Field`, `Event`, or `Constructor`. Nullable fields such as `DocumentationId`, `DeclaringType`, `TargetFramework`, and `AssetKind` may be `null`.
+`Kind` is one of `Type`, `Method`, `Property`, `Field`, `Event`, or `Constructor`. JSON omits nullable fields when no value is available. `Documentation` is included when XML documentation comments are available for a symbol.
 
 Important JSON details for agents:
 
 - Values are case-sensitive. Current `Visibility` values are lower-case, e.g. `public`.
+- `Signature` is a C#-like declaration string. For non-type symbols it includes visibility; properties include accessor declarations such as `{ get; private set; }`, events include the `event` keyword, and constructors omit a return type.
 - Type symbols include a declaration `Signature`, a human-readable `Classification`, a machine-readable `TypeKind` (`Class`, `Interface`, `Struct`, `Enum`, or `Delegate`), and `Modifiers` such as `static`, `sealed`, or `abstract`.
+- Property symbols may include `Accessors` with C#-like accessor declarations, including non-public accessor visibility when present.
 - To answer "classes", prefer `TypeKind == "Class"` instead of parsing `Classification`.
 - NuGet package assembly entries include `TargetFramework` and `AssetKind`; use `--tfm <target-framework>` to inspect a single TFM and avoid duplicate symbols across target frameworks.
+- Symbols may include `Documentation` extracted from adjacent/package XML documentation files; absence means no XML summary was found.
 
 ## When to use
 
@@ -94,7 +108,7 @@ nuscope inspect ./My.Library.dll --include-non-public --format json
 ## Options
 
 - `--format text|json`: output format; default is `text`.
-- `--search <term>`: case-insensitive match over symbol names and signatures.
+- `--search <term>`: case-insensitive match over symbol names, signatures, and documentation.
 - `--kind <type|method|property|field|event|constructor>`: restrict symbols by kind.
 - `--tfm <target-framework>`: for NuGet packages, inspect only assemblies for one target framework, such as `net8.0` or `netstandard2.0`.
 - `--include-non-public`: include non-public types and members.

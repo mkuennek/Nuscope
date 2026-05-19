@@ -96,7 +96,8 @@ internal static class PackageInspector
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
             memory.Position = 0;
-            reports.Add(InspectAssembly($"{packageName}:{entry.FullName}", memory, options, asset.TargetFramework, asset.AssetKind));
+            var documentation = LoadPackageDocumentation(archive, entry.FullName);
+            reports.Add(InspectAssembly($"{packageName}:{entry.FullName}", memory, options, asset.TargetFramework, asset.AssetKind, documentation));
         }
 
         return reports;
@@ -119,18 +120,50 @@ internal static class PackageInspector
     }
 
     /// <summary>
+    /// Loads XML documentation comments from a package entry matching the assembly path and name.
+    /// </summary>
+    private static DocumentationComments LoadPackageDocumentation(ZipArchive archive, string assemblyEntryName)
+    {
+        var documentationEntryName = Path.ChangeExtension(assemblyEntryName, ".xml").Replace('\\', '/');
+        var documentationEntry = archive.GetEntry(documentationEntryName);
+        if (documentationEntry is null)
+        {
+            return DocumentationComments.Empty;
+        }
+
+        using var documentationStream = documentationEntry.Open();
+        return DocumentationComments.Load(documentationStream);
+    }
+
+    /// <summary>
+    /// Loads compiler-generated XML documentation comments next to a local assembly when present.
+    /// </summary>
+    private static DocumentationComments LoadLocalDocumentation(string assemblyPath)
+    {
+        var documentationPath = Path.ChangeExtension(assemblyPath, ".xml");
+        if (!File.Exists(documentationPath))
+        {
+            return DocumentationComments.Empty;
+        }
+
+        using var documentationStream = File.OpenRead(documentationPath);
+        return DocumentationComments.Load(documentationStream);
+    }
+
+    /// <summary>
     /// Opens an assembly file from disk and delegates metadata inspection to the stream-based reader.
     /// </summary>
     private static AssemblyReport InspectAssembly(string displayPath, string filePath, InspectOptions options, string? targetFramework, string? assetKind)
     {
         using var stream = File.OpenRead(filePath);
-        return InspectAssembly(displayPath, stream, options, targetFramework, assetKind);
+        var documentation = LoadLocalDocumentation(filePath);
+        return InspectAssembly(displayPath, stream, options, targetFramework, assetKind, documentation);
     }
 
     /// <summary>
     /// Reads .NET metadata from an assembly stream and collects matching type and member symbols.
     /// </summary>
-    private static AssemblyReport InspectAssembly(string displayPath, Stream stream, InspectOptions options, string? targetFramework, string? assetKind)
+    private static AssemblyReport InspectAssembly(string displayPath, Stream stream, InspectOptions options, string? targetFramework, string? assetKind, DocumentationComments documentation)
     {
         // PEReader lets us inspect assembly metadata without loading user code into the current process.
         using var peReader = new PEReader(stream, PEStreamOptions.PrefetchMetadata);
@@ -163,22 +196,23 @@ internal static class PackageInspector
 
             var baseType = formatter.FormatBaseType(type);
             var typeShape = TypeShape.FromAttributes(type.Attributes, baseType);
+            var documentationId = DocumentationId.ForType(typeName);
             AddIfMatched(symbols, options, new SymbolInfo(
                 SymbolKind.Type,
                 typeName,
                 typeShape.Classification,
                 typeVisibility,
                 formatter.FormatTypeDefinition(type, typeVisibility, typeShape),
-                null,
+                documentation.Get(documentationId),
                 baseType,
                 displayPath,
                 typeShape.Kind,
                 typeShape.Modifiers));
 
-            AddFields(reader, formatter, options, symbols, type, typeName, displayPath);
-            AddProperties(reader, formatter, options, symbols, type, typeName, displayPath);
-            AddEvents(reader, formatter, options, symbols, type, typeName, displayPath);
-            AddMethods(reader, formatter, options, symbols, type, typeName, displayPath);
+            AddFields(reader, formatter, options, symbols, type, typeName, displayPath, documentation);
+            AddProperties(reader, formatter, options, symbols, type, typeName, displayPath, documentation);
+            AddEvents(reader, formatter, options, symbols, type, typeName, displayPath, documentation);
+            AddMethods(reader, formatter, options, symbols, type, typeName, displayPath, documentation);
         }
 
         return new AssemblyReport(displayPath, assemblyName, targetFramework, assetKind, symbols);
@@ -194,7 +228,8 @@ internal static class PackageInspector
         List<SymbolInfo> symbols,
         TypeDefinition type,
         string typeName,
-        string displayPath)
+        string displayPath,
+        DocumentationComments documentation)
     {
         foreach (var fieldHandle in type.GetFields())
         {
@@ -206,13 +241,14 @@ internal static class PackageInspector
             }
 
             var fieldName = reader.GetString(field.Name);
+            var documentationId = DocumentationId.ForField(typeName, field, reader);
             AddIfMatched(symbols, options, new SymbolInfo(
                 SymbolKind.Field,
                 $"{typeName}.{fieldName}",
                 "field",
                 visibility,
-                formatter.FormatField(field),
-                null,
+                formatter.FormatField(type, field),
+                documentation.Get(documentationId),
                 typeName,
                 displayPath));
         }
@@ -228,7 +264,8 @@ internal static class PackageInspector
         List<SymbolInfo> symbols,
         TypeDefinition type,
         string typeName,
-        string displayPath)
+        string displayPath,
+        DocumentationComments documentation)
     {
         foreach (var propertyHandle in type.GetProperties())
         {
@@ -240,16 +277,43 @@ internal static class PackageInspector
                 continue;
             }
 
+            var documentationId = DocumentationId.ForProperty(typeName, property, reader);
             AddIfMatched(symbols, options, new SymbolInfo(
                 SymbolKind.Property,
                 $"{typeName}.{propertyName}",
                 "property",
                 visibility,
-                formatter.FormatProperty(property),
-                null,
+                formatter.FormatProperty(type, property),
+                documentation.Get(documentationId),
                 typeName,
-                displayPath));
+                displayPath,
+                Accessors: GetPropertyAccessors(reader, property.GetAccessors(), visibility)));
         }
+    }
+
+    /// <summary>
+    /// Returns C#-like property accessor declarations, preserving non-public accessor visibility when relevant.
+    /// </summary>
+    private static IReadOnlyList<string> GetPropertyAccessors(MetadataReader reader, PropertyAccessors accessors, string propertyVisibility)
+    {
+        var declarations = new List<string>(capacity: 2);
+        AddAccessor(declarations, reader, accessors.Getter, propertyVisibility, "get");
+        AddAccessor(declarations, reader, accessors.Setter, propertyVisibility, "set");
+        return declarations;
+    }
+
+    /// <summary>
+    /// Adds one accessor declaration when the accessor method exists.
+    /// </summary>
+    private static void AddAccessor(List<string> declarations, MetadataReader reader, MethodDefinitionHandle handle, string propertyVisibility, string keyword)
+    {
+        if (handle.IsNil)
+        {
+            return;
+        }
+
+        var accessorVisibility = Visibility.FromMethodAttributes(reader.GetMethodDefinition(handle).Attributes);
+        declarations.Add(accessorVisibility == propertyVisibility ? $"{keyword};" : $"{accessorVisibility} {keyword};");
     }
 
     /// <summary>
@@ -262,7 +326,8 @@ internal static class PackageInspector
         List<SymbolInfo> symbols,
         TypeDefinition type,
         string typeName,
-        string displayPath)
+        string displayPath,
+        DocumentationComments documentation)
     {
         foreach (var eventHandle in type.GetEvents())
         {
@@ -274,13 +339,14 @@ internal static class PackageInspector
                 continue;
             }
 
+            var documentationId = DocumentationId.ForEvent(typeName, eventDef, reader);
             AddIfMatched(symbols, options, new SymbolInfo(
                 SymbolKind.Event,
                 $"{typeName}.{eventName}",
                 "event",
                 visibility,
-                formatter.FormatEvent(eventDef),
-                null,
+                formatter.FormatEvent(type, eventDef),
+                documentation.Get(documentationId),
                 typeName,
                 displayPath));
         }
@@ -296,7 +362,8 @@ internal static class PackageInspector
         List<SymbolInfo> symbols,
         TypeDefinition type,
         string typeName,
-        string displayPath)
+        string displayPath,
+        DocumentationComments documentation)
     {
         foreach (var methodHandle in type.GetMethods())
         {
@@ -314,13 +381,14 @@ internal static class PackageInspector
                 continue;
             }
 
+            var documentationId = DocumentationId.ForMethod(typeName, method, reader);
             AddIfMatched(symbols, options, new SymbolInfo(
                 kind,
                 $"{typeName}.{(kind == SymbolKind.Constructor ? MetadataNames.GetShortName(typeName) : methodName)}",
                 kind == SymbolKind.Constructor ? "constructor" : "method",
                 visibility,
-                formatter.FormatMethod(method),
-                null,
+                formatter.FormatMethod(type, method),
+                documentation.Get(documentationId),
                 typeName,
                 displayPath));
         }

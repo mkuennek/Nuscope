@@ -11,7 +11,7 @@ internal static class OutputWriter
     {
         if (format == OutputFormat.Json)
         {
-            writer.WriteLine(JsonSerializer.Serialize(report, NuscopeJsonContext.Default.InspectionReport));
+            writer.WriteLine(JsonSerializer.Serialize(WithJsonSignatures(report), NuscopeJsonContext.Default.InspectionReport));
             return;
         }
 
@@ -25,7 +25,44 @@ internal static class OutputWriter
     }
 
     /// <summary>
-    /// Groups text output by namespace and declaring type so related symbols are shown together.
+    /// Returns a report whose JSON signatures use the same C#-like declaration shape as text output.
+    /// </summary>
+    private static InspectionReport WithJsonSignatures(InspectionReport report) =>
+        report with
+        {
+            Assemblies = report.Assemblies
+                .Select(assembly => assembly with
+                {
+                    Symbols = assembly.Symbols
+                        .Select(symbol => symbol with { Signature = FormatJsonSignature(symbol) })
+                        .ToArray()
+                })
+                .ToArray()
+        };
+
+    /// <summary>
+    /// Formats a self-contained C#-like declaration for JSON without text-only trailing semicolons.
+    /// </summary>
+    private static string FormatJsonSignature(SymbolInfo symbol)
+    {
+        if (symbol.Kind == SymbolKind.Type)
+        {
+            return symbol.Signature ?? $"{symbol.Visibility} {symbol.Classification} {symbol.Name}";
+        }
+
+        var signature = symbol.Signature ?? symbol.Name;
+        var declaringType = !string.IsNullOrWhiteSpace(symbol.DeclaringType) ? symbol.DeclaringType : GetTypeName(symbol);
+        return symbol.Kind switch
+        {
+            SymbolKind.Constructor => $"{symbol.Visibility} {GetCallableDeclaration(signature, GetShortTypeName(declaringType))}",
+            SymbolKind.Property => $"{symbol.Visibility} {signature} {{ {FormatAccessors(symbol)} }}",
+            SymbolKind.Event => $"{symbol.Visibility} event {signature}",
+            _ => $"{symbol.Visibility} {signature}"
+        };
+    }
+
+    /// <summary>
+    /// Groups text output by namespace and declaring type, using a C#-like declaration layout for readability.
     /// </summary>
     private static void WriteGroupedSymbols(TextWriter writer, IReadOnlyList<SymbolInfo> symbols)
     {
@@ -33,32 +70,127 @@ internal static class OutputWriter
             .GroupBy(GetNamespace)
             .OrderBy(g => g.Key, StringComparer.Ordinal))
         {
-            writer.WriteLine($"  namespace {namespaceGroup.Key}");
+            if (namespaceGroup.Key != "<global>")
+            {
+                writer.WriteLine($"  namespace {namespaceGroup.Key};");
+                writer.WriteLine();
+            }
 
+            var firstType = true;
             foreach (var typeGroup in namespaceGroup
                 .GroupBy(GetTypeName)
                 .OrderBy(g => g.Key, StringComparer.Ordinal))
             {
+                if (!firstType)
+                {
+                    writer.WriteLine("----------------------------------------");
+                    writer.WriteLine();
+                }
+
+                firstType = false;
+                var typeName = typeGroup.Key;
                 var typeSymbol = typeGroup.FirstOrDefault(s => s.Kind == SymbolKind.Type);
                 if (typeSymbol is not null)
                 {
-                    writer.WriteLine($"    {GetShortTypeName(typeGroup.Key)} ({typeSymbol.Classification}, {typeSymbol.Visibility})");
+                    WriteDocumentation(writer, typeSymbol, "  ");
+                    writer.WriteLine($"  {FormatTypeDeclaration(typeSymbol, typeName)}");
                 }
                 else
                 {
-                    writer.WriteLine($"    {GetShortTypeName(typeGroup.Key)}");
+                    writer.WriteLine($"  {GetShortTypeName(typeName)}");
                 }
+
+                writer.WriteLine("  {");
 
                 foreach (var symbol in typeGroup
                     .Where(s => s.Kind != SymbolKind.Type)
                     .OrderBy(s => GetKindOrder(s.Kind))
                     .ThenBy(s => s.Name, StringComparer.Ordinal))
                 {
-                    var signature = symbol.Signature is null ? symbol.Name : symbol.Signature;
-                    writer.WriteLine($"      {symbol.Kind.ToString().ToLowerInvariant(),-11} {symbol.Visibility,-18} {signature}");
+                    WriteDocumentation(writer, symbol, "    ");
+                    writer.WriteLine($"    {FormatMemberDeclaration(symbol, typeName)}");
+                    writer.WriteLine();
                 }
+
+                writer.WriteLine("  }");
+                writer.WriteLine();
             }
         }
+    }
+
+    /// <summary>
+    /// Writes normalized XML documentation comments above a declaration when available.
+    /// </summary>
+    private static void WriteDocumentation(TextWriter writer, SymbolInfo symbol, string indent)
+    {
+        if (string.IsNullOrWhiteSpace(symbol.Documentation))
+        {
+            return;
+        }
+
+        writer.WriteLine($"{indent}/// <summary>");
+        writer.WriteLine($"{indent}/// {symbol.Documentation}");
+        writer.WriteLine($"{indent}/// </summary>");
+    }
+
+    /// <summary>
+    /// Formats a type declaration as C#-like text while preserving metadata-derived modifiers.
+    /// </summary>
+    private static string FormatTypeDeclaration(SymbolInfo symbol, string typeName)
+    {
+        var declaration = symbol.Signature ?? $"{symbol.Visibility} {symbol.Classification} {typeName}";
+        var namespaceEnd = typeName.LastIndexOf('.');
+        if (namespaceEnd >= 0)
+        {
+            declaration = declaration.Replace(typeName[..(namespaceEnd + 1)], string.Empty, StringComparison.Ordinal);
+        }
+
+        return declaration.Replace(typeName, GetShortTypeName(typeName), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Formats a member declaration as C#-like text using currently available metadata.
+    /// </summary>
+    private static string FormatMemberDeclaration(SymbolInfo symbol, string typeName)
+    {
+        var signature = symbol.Signature ?? symbol.Name;
+        return symbol.Kind switch
+        {
+            SymbolKind.Constructor => $"{symbol.Visibility} {GetCallableDeclaration(signature, GetShortTypeName(typeName))};",
+            SymbolKind.Property => $"{symbol.Visibility} {signature} {{ {FormatAccessors(symbol)} }}",
+            SymbolKind.Event => $"{symbol.Visibility} event {signature};",
+            _ => $"{symbol.Visibility} {signature};"
+        };
+    }
+
+    /// <summary>
+    /// Formats property accessors, falling back to get-only for older symbol data.
+    /// </summary>
+    private static string FormatAccessors(SymbolInfo symbol) =>
+        symbol.Accessors is { Count: > 0 } accessors ? string.Join(' ', accessors) : "get;";
+
+    /// <summary>
+    /// Extracts the parameter list from a formatted method signature.
+    /// </summary>
+    private static string GetParameterList(string signature)
+    {
+        var start = signature.IndexOf('(');
+        return start < 0 ? "()" : signature[start..];
+    }
+
+    /// <summary>
+    /// Removes the metadata return type from a formatted method-like signature.
+    /// </summary>
+    private static string GetCallableDeclaration(string signature, string fallbackName)
+    {
+        var parameterStart = signature.IndexOf('(');
+        if (parameterStart < 0)
+        {
+            return $"{fallbackName}()";
+        }
+
+        var nameStart = signature.LastIndexOf(' ', parameterStart);
+        return nameStart < 0 ? signature : signature[(nameStart + 1)..];
     }
 
     /// <summary>
@@ -96,7 +228,8 @@ internal static class OutputWriter
     private static string GetShortTypeName(string typeName)
     {
         var index = typeName.LastIndexOf('.');
-        return index < 0 ? typeName : typeName[(index + 1)..];
+        var shortName = index < 0 ? typeName : typeName[(index + 1)..];
+        return MetadataNames.StripGenericArity(shortName);
     }
 
     /// <summary>
