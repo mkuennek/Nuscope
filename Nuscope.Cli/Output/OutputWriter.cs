@@ -11,7 +11,7 @@ internal static class OutputWriter
     {
         if (format == OutputFormat.Json)
         {
-            writer.WriteLine(JsonSerializer.Serialize(report, NuscopeJsonContext.Default.InspectionReport));
+            writer.WriteLine(JsonSerializer.Serialize(WithJsonSignatures(report), NuscopeJsonContext.Default.InspectionReport));
             return;
         }
 
@@ -22,6 +22,43 @@ internal static class OutputWriter
             writer.WriteLine($"{assembly.AssemblyName} ({assembly.Path})");
             WriteGroupedSymbols(writer, assembly.Symbols);
         }
+    }
+
+    /// <summary>
+    /// Returns a report whose JSON signatures use the same C#-like declaration shape as text output.
+    /// </summary>
+    private static InspectionReport WithJsonSignatures(InspectionReport report) =>
+        report with
+        {
+            Assemblies = report.Assemblies
+                .Select(assembly => assembly with
+                {
+                    Symbols = assembly.Symbols
+                        .Select(symbol => symbol with { Signature = FormatJsonSignature(symbol) })
+                        .ToArray()
+                })
+                .ToArray()
+        };
+
+    /// <summary>
+    /// Formats a self-contained C#-like declaration for JSON without text-only trailing semicolons.
+    /// </summary>
+    private static string FormatJsonSignature(SymbolInfo symbol)
+    {
+        if (symbol.Kind == SymbolKind.Type)
+        {
+            return symbol.Signature ?? $"{symbol.Visibility} {symbol.Classification} {symbol.Name}";
+        }
+
+        var signature = symbol.Signature ?? symbol.Name;
+        var declaringType = !string.IsNullOrWhiteSpace(symbol.DeclaringType) ? symbol.DeclaringType : GetTypeName(symbol);
+        return symbol.Kind switch
+        {
+            SymbolKind.Constructor => $"{symbol.Visibility} {GetCallableDeclaration(signature, GetShortTypeName(declaringType))}",
+            SymbolKind.Property => $"{symbol.Visibility} {signature} {{ {FormatAccessors(symbol)} }}",
+            SymbolKind.Event => $"{symbol.Visibility} event {signature}",
+            _ => $"{symbol.Visibility} {signature}"
+        };
     }
 
     /// <summary>

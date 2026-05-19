@@ -79,8 +79,10 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("\"sealed\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Widget\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Constructor\"");
+            await Assert.That(result.Output).Contains("\"Signature\": \"public Widget(string)\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Name\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Property\"");
+            await Assert.That(result.Output).Contains("\"Signature\": \"public string Name { get; }\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Priority\"");
             await Assert.That(result.Output).Contains("\"Accessors\": [");
             await Assert.That(result.Output).Contains("\"get;\"");
@@ -89,11 +91,14 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("\"private set;\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Resize\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Method\"");
+            await Assert.That(result.Output).Contains("\"Signature\": \"public int32 Resize(int32, int32)\"");
             await Assert.That(result.Output).Contains("\"Documentation\": \"Resizes the widget and returns the new area.\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Changed\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Event\"");
+            await Assert.That(result.Output).Contains("\"Signature\": \"public event System.EventHandler Changed\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.DefaultName\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Field\"");
+            await Assert.That(result.Output).Contains("\"Signature\": \"public string DefaultName\"");
             await Assert.That(result.Output).Contains("\"Classification\": \"struct\"");
             await Assert.That(result.Output).Contains("\"Classification\": \"enum\"");
         }
