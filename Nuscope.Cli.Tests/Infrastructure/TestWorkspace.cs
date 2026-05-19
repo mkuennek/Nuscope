@@ -74,7 +74,7 @@ internal sealed class TestWorkspace
             }
 
             /// <summary>
-            /// Represents a documented sample widget.
+            /// Represents a documented <see cref="Widget"/>.
             /// </summary>
             public sealed class Widget : IWidget
             {
@@ -82,8 +82,12 @@ internal sealed class TestWorkspace
                 public const string DefaultName = "widget";
                 /// <summary>Gets the widget display name.</summary>
                 public string Name { get; }
+                /// <summary>Gets or sets the widget priority.</summary>
+                public int Priority { get; set; }
                 /// <summary>Raised when the widget changes.</summary>
                 public event EventHandler? Changed;
+                /// <summary>Gets the widget instance identifier.</summary>
+                public Guid Id { get; private set; }
                 /// <summary>Creates a widget with the supplied name.</summary>
                 public Widget(string name) => Name = name;
                 /// <summary>Resizes the widget and returns the new area.</summary>

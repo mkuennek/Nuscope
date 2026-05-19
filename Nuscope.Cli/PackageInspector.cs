@@ -286,8 +286,34 @@ internal static class PackageInspector
                 formatter.FormatProperty(property),
                 documentation.Get(documentationId),
                 typeName,
-                displayPath));
+                displayPath,
+                Accessors: GetPropertyAccessors(reader, property.GetAccessors(), visibility)));
         }
+    }
+
+    /// <summary>
+    /// Returns C#-like property accessor declarations, preserving non-public accessor visibility when relevant.
+    /// </summary>
+    private static IReadOnlyList<string> GetPropertyAccessors(MetadataReader reader, PropertyAccessors accessors, string propertyVisibility)
+    {
+        var declarations = new List<string>(capacity: 2);
+        AddAccessor(declarations, reader, accessors.Getter, propertyVisibility, "get");
+        AddAccessor(declarations, reader, accessors.Setter, propertyVisibility, "set");
+        return declarations;
+    }
+
+    /// <summary>
+    /// Adds one accessor declaration when the accessor method exists.
+    /// </summary>
+    private static void AddAccessor(List<string> declarations, MetadataReader reader, MethodDefinitionHandle handle, string propertyVisibility, string keyword)
+    {
+        if (handle.IsNil)
+        {
+            return;
+        }
+
+        var accessorVisibility = Visibility.FromMethodAttributes(reader.GetMethodDefinition(handle).Attributes);
+        declarations.Add(accessorVisibility == propertyVisibility ? $"{keyword};" : $"{accessorVisibility} {keyword};");
     }
 
     /// <summary>

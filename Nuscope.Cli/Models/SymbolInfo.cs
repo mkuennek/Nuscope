@@ -10,7 +10,8 @@ internal sealed record SymbolInfo(
     string? DeclaringType,
     string AssemblyPath,
     TypeKind? TypeKind = null,
-    IReadOnlyList<string>? Modifiers = null)
+    IReadOnlyList<string>? Modifiers = null,
+    IReadOnlyList<string>? Accessors = null)
 {
     /// <summary>
     /// Checks whether a user search term appears in the symbol's searchable report fields.
@@ -23,5 +24,6 @@ internal sealed record SymbolInfo(
         || (Documentation?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
         || (DeclaringType?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
         || (TypeKind?.ToString().Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-        || (Modifiers?.Any(modifier => modifier.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false);
+        || (Modifiers?.Any(modifier => modifier.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false)
+        || (Accessors?.Any(accessor => accessor.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false);
 }
