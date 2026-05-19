@@ -53,6 +53,8 @@ internal sealed class TestWorkspace
                 <LangVersion>latest</LangVersion>
                 <Nullable>enable</Nullable>
                 <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+                <GenerateDocumentationFile>true</GenerateDocumentationFile>
+                <NoWarn>$(NoWarn);1591</NoWarn>
                 <PackageId>Nuscope.Sample</PackageId>
                 <Version>1.0.0</Version>
               </PropertyGroup>
@@ -71,12 +73,20 @@ internal sealed class TestWorkspace
                 int Resize(int width, int height);
             }
 
+            /// <summary>
+            /// Represents a documented sample widget.
+            /// </summary>
             public sealed class Widget : IWidget
             {
+                /// <summary>The fallback widget name.</summary>
                 public const string DefaultName = "widget";
+                /// <summary>Gets the widget display name.</summary>
                 public string Name { get; }
+                /// <summary>Raised when the widget changes.</summary>
                 public event EventHandler? Changed;
+                /// <summary>Creates a widget with the supplied name.</summary>
                 public Widget(string name) => Name = name;
+                /// <summary>Resizes the widget and returns the new area.</summary>
                 public int Resize(int width, int height) => width * height;
                 internal void Hidden() { }
             }

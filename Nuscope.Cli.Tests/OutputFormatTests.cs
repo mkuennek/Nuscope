@@ -23,7 +23,9 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.ExitCode).IsEqualTo(0);
             await Assert.That(result.Output).Contains("  namespace Nuscope.Sample");
             await Assert.That(result.Output).Contains("    Widget (sealed class, public)");
+            await Assert.That(result.Output).Contains("      /// Represents a documented sample widget.");
             await Assert.That(result.Output).Contains("      constructor public             void ctor(string)");
+            await Assert.That(result.Output).Contains("        /// Creates a widget with the supplied name.");
             await Assert.That(result.Output).Contains("      property    public             string Name");
             await Assert.That(result.Output).Contains("      method      public             int32 Resize(int32, int32)");
             await Assert.That(result.Output).Contains("      event       public             System.EventHandler Changed");
@@ -57,6 +59,7 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget\"");
             await Assert.That(result.Output).Contains("\"Classification\": \"sealed class\"");
             await Assert.That(result.Output).Contains("\"Signature\": \"public sealed class Nuscope.Sample.Widget\"");
+            await Assert.That(result.Output).Contains("\"Documentation\": \"Represents a documented sample widget.\"");
             await Assert.That(result.Output).Contains("\"TypeKind\": \"Class\"");
             await Assert.That(result.Output).Contains("\"Modifiers\": [");
             await Assert.That(result.Output).Contains("\"sealed\"");
@@ -66,12 +69,34 @@ public sealed class OutputFormatTests(string targetName)
             await Assert.That(result.Output).Contains("\"Kind\": \"Property\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Resize\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Method\"");
+            await Assert.That(result.Output).Contains("\"Documentation\": \"Resizes the widget and returns the new area.\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.Changed\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Event\"");
             await Assert.That(result.Output).Contains("\"Name\": \"Nuscope.Sample.Widget.DefaultName\"");
             await Assert.That(result.Output).Contains("\"Kind\": \"Field\"");
             await Assert.That(result.Output).Contains("\"Classification\": \"struct\"");
             await Assert.That(result.Output).Contains("\"Classification\": \"enum\"");
+        }
+    }
+
+    /// <summary>
+    /// Verifies that JSON output omits nullable properties instead of emitting noisy null values.
+    /// </summary>
+    [Test]
+    public async Task Json_format_omits_null_values()
+    {
+        // Arrange
+        await using var target = await InspectTargetCases.ResolveAsync(targetName);
+
+        // Act
+        var result = await CliTestRunner.RunAsync([.. target.BaseArgs, "--format", "json"]);
+
+        // Assert
+        using (Assert.Multiple())
+        {
+            await Assert.That(result.ExitCode).IsEqualTo(0);
+            await Assert.That(result.Output).DoesNotContain(": null");
+            await Assert.That(result.Output).DoesNotContain("\"Documentation\": null");
         }
     }
 }

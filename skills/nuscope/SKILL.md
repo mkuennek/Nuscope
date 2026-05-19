@@ -29,7 +29,7 @@ JSON uses PascalCase property names and string enum values:
           "Classification": "static class",
           "Visibility": "public",
           "Signature": "public static class Newtonsoft.Json.JsonConvert",
-          "DocumentationId": null,
+          "Documentation": "Provides methods for converting between .NET types and JSON types.",
           "DeclaringType": "System.Object",
           "AssemblyPath": "lib/netstandard2.0/Newtonsoft.Json.dll",
           "TypeKind": "Class",
@@ -41,7 +41,7 @@ JSON uses PascalCase property names and string enum values:
 }
 ```
 
-`Kind` is one of `Type`, `Method`, `Property`, `Field`, `Event`, or `Constructor`. Nullable fields such as `DocumentationId`, `DeclaringType`, `TargetFramework`, and `AssetKind` may be `null`.
+`Kind` is one of `Type`, `Method`, `Property`, `Field`, `Event`, or `Constructor`. JSON omits nullable fields when no value is available. `Documentation` is included when XML documentation comments are available for a symbol.
 
 Important JSON details for agents:
 
@@ -49,6 +49,7 @@ Important JSON details for agents:
 - Type symbols include a declaration `Signature`, a human-readable `Classification`, a machine-readable `TypeKind` (`Class`, `Interface`, `Struct`, `Enum`, or `Delegate`), and `Modifiers` such as `static`, `sealed`, or `abstract`.
 - To answer "classes", prefer `TypeKind == "Class"` instead of parsing `Classification`.
 - NuGet package assembly entries include `TargetFramework` and `AssetKind`; use `--tfm <target-framework>` to inspect a single TFM and avoid duplicate symbols across target frameworks.
+- Symbols may include `Documentation` extracted from adjacent/package XML documentation files; absence means no XML summary was found.
 
 ## When to use
 
@@ -94,7 +95,7 @@ nuscope inspect ./My.Library.dll --include-non-public --format json
 ## Options
 
 - `--format text|json`: output format; default is `text`.
-- `--search <term>`: case-insensitive match over symbol names and signatures.
+- `--search <term>`: case-insensitive match over symbol names, signatures, and documentation.
 - `--kind <type|method|property|field|event|constructor>`: restrict symbols by kind.
 - `--tfm <target-framework>`: for NuGet packages, inspect only assemblies for one target framework, such as `net8.0` or `netstandard2.0`.
 - `--include-non-public`: include non-public types and members.

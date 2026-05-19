@@ -43,6 +43,7 @@ internal static class OutputWriter
                 if (typeSymbol is not null)
                 {
                     writer.WriteLine($"    {GetShortTypeName(typeGroup.Key)} ({typeSymbol.Classification}, {typeSymbol.Visibility})");
+                    WriteDocumentation(writer, typeSymbol, "      ");
                 }
                 else
                 {
@@ -56,8 +57,20 @@ internal static class OutputWriter
                 {
                     var signature = symbol.Signature is null ? symbol.Name : symbol.Signature;
                     writer.WriteLine($"      {symbol.Kind.ToString().ToLowerInvariant(),-11} {symbol.Visibility,-18} {signature}");
+                    WriteDocumentation(writer, symbol, "        ");
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Writes normalized XML documentation comments below the symbol line when available.
+    /// </summary>
+    private static void WriteDocumentation(TextWriter writer, SymbolInfo symbol, string indent)
+    {
+        if (!string.IsNullOrWhiteSpace(symbol.Documentation))
+        {
+            writer.WriteLine($"{indent}/// {symbol.Documentation}");
         }
     }
 
