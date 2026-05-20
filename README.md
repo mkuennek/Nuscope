@@ -6,6 +6,8 @@ Nuscope is a .NET CLI tool for inspecting NuGet packages and .NET assemblies wit
 
 ## Install
 
+Requires the .NET 8 SDK/runtime or newer.
+
 ```sh
 dotnet tool install --global Nuscope
 ```
