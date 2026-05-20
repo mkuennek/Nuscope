@@ -26,5 +26,6 @@
   <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath="/" />
     <None Include="../Images/icon.png" Pack="true" PackagePath="/" />
+    <EmbeddedResource Include="../skills/nuscope/SKILL.md" LogicalName="Nuscope.Skill.SKILL.md" />
   </ItemGroup>
 </Project>

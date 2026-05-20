@@ -18,7 +18,17 @@ dotnet tool update --global Nuscope
 
 ## Agent skill
 
-Nuscope also ships with an agent skill for Pi-compatible agents. Download the skill from [here](https://raw.githubusercontent.com/mkuennek/Nuscope/refs/heads/main/skills/nuscope/SKILL.md) and put it into a location compatible with your coding agent.
+Nuscope also ships with an agent skill for Pi-compatible agents. Install it into the nearest local project:
+
+```sh
+nuscope skill local
+```
+
+Or install it globally under your home directory:
+
+```sh
+nuscope skill global
+```
 
 Once installed, agents can use the skill to inspect `.dll` and `.nupkg` files or remote NuGet packages without resorting to brittle `ilspycmd` wrappers or improvised shell glue.
 

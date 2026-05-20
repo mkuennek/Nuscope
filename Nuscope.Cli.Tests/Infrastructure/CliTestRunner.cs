@@ -7,7 +7,12 @@ internal static class CliTestRunner
     /// <summary>
     /// Runs the built nuscope CLI as a child process and captures its exit code and output streams.
     /// </summary>
-    public static async Task<CliResult> RunAsync(string[] args)
+    public static Task<CliResult> RunAsync(string[] args) => RunCommandAsync(["inspect", .. args]);
+
+    public static async Task<CliResult> RunCommandAsync(
+        string[] args,
+        string? workingDirectory = null,
+        IReadOnlyDictionary<string, string?>? environment = null)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -15,8 +20,17 @@ internal static class CliTestRunner
             RedirectStandardOutput = true
         };
 
+        if (workingDirectory is not null)
+        {
+            startInfo.WorkingDirectory = workingDirectory;
+        }
+
+        foreach (var (key, value) in environment ?? new Dictionary<string, string?>())
+        {
+            startInfo.Environment[key] = value;
+        }
+
         startInfo.ArgumentList.Add(CliAssembly.Path);
-        startInfo.ArgumentList.Add("inspect");
 
         foreach (var arg in args)
         {
