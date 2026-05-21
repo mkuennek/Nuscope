@@ -15,18 +15,23 @@ public static class Program
                 return 0;
             }
 
-            if (args[0] != "inspect")
+            if (args[0] == "skill")
             {
-                await Console.Error.WriteLineAsync($"Unknown command '{args[0]}'.");
-                Usage.Write(Console.Error);
-                return 2;
+                await SkillInstaller.InstallAsync(args[1..]);
+                return 0;
             }
 
-            // $nuscope inspect...
-            var options = InspectOptions.Parse(args.AsSpan(1));
-            var report = await PackageInspector.InspectAsync(options);
-            OutputWriter.Write(Console.Out, report, options.Format);
-            return 0;
+            if (args[0] == "inspect")
+            {
+                var options = InspectOptions.Parse(args.AsSpan(1));
+                var report = await PackageInspector.InspectAsync(options);
+                OutputWriter.Write(Console.Out, report, options.Format);
+                return 0;
+            }
+
+            await Console.Error.WriteLineAsync($"Unknown command '{args[0]}'.");
+            Usage.Write(Console.Error);
+            return 2;
         }
         catch (CliException ex)
         {

@@ -8,7 +8,7 @@
     <AssemblyName>nuscope</AssemblyName>
     <RootNamespace>Nuscope.Cli</RootNamespace>
     <PackageId>Nuscope</PackageId>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>Nuscope</Authors>
     <Description>Inspect NuGet packages and .NET assemblies for discoverable symbols.</Description>
     <PackageTags>nuget;metadata;assembly;cli;tool</PackageTags>
@@ -27,5 +27,6 @@
   <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath="/" />
     <None Include="../Images/icon.png" Pack="true" PackagePath="/" />
+    <EmbeddedResource Include="../skills/nuscope/SKILL.md" LogicalName="Nuscope.Skill.SKILL.md" />
   </ItemGroup>
 </Project>
